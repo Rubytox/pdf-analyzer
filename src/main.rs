@@ -1,16 +1,23 @@
-use std::error;
 use std::fs;
 use std::io::{BufRead, BufReader};
 use std::process::Child;
 use std::process::Command;
 use std::process::Stdio;
 
+use std::collections::HashMap;
+
+struct Version {
+    primary: u64,
+    secondary: u64
+}
+
 struct Metadata {
+    filename: String,
     producer: Option<String>,
     creator: Option<String>,
     author: Option<String>,
     creator_tool: Option<String>,
-    pdf_version: u32,
+    pdf_version: Version,
     title: Option<String>,
     xmp_toolkit: Option<String>,
     create_date: Option<String>,
@@ -24,27 +31,37 @@ fn update_metadata(meta: &mut Metadata, line: String) {
     match &id[..] {
         "Producer" => meta.producer = Some(parts[1].into()),
         "Creator" => meta.creator = Some(parts[1].into()),
-        "Author" => meta.creator = Some(parts[1].into()),
-        "CreatorTool" => meta.creator = Some(parts[1].into()),
-        "PDFVersion" => meta.creator = Some(parts[1].into()),
-        "Title" => meta.creator = Some(parts[1].into()),
-        "XMPToolkit" => meta.creator = Some(parts[1].into()),
-        "CreateDate" => meta.creator = Some(parts[1].into()),
-        "ModifyDate" => meta.creator = Some(parts[1].into()),
+        "Author" => meta.author = Some(parts[1].into()),
+        "CreatorTool" => meta.creator_tool = Some(parts[1].into()),
+        "PDFVersion" => { 
+            let version = parts[1].parse::<f64>().unwrap();
+            meta.pdf_version = Version {
+                primary: version.trunc() as u64,
+                secondary: version.fract() as u64
+            };
+        },
+        "Title" => meta.title = Some(parts[1].into()),
+        "XMPToolkit" => meta.xmp_toolkit = Some(parts[1].into()),
+        "CreateDate" => meta.create_date = Some(parts[1].into()),
+        "ModifyDate" => meta.modify_date = Some(parts[1].into()),
         _ => (),
     }
 }
 
-fn read_metadata(child: &mut Child) -> Option<Metadata> {
+fn read_metadata(filename: &str, child: &mut Child) -> Option<Metadata> {
     if let Some(ref mut stdout) = child.stdout {
         let lines = BufReader::new(stdout).lines().enumerate();
 
         let mut meta = Metadata {
+            filename: filename.into(),
             producer: None,
             creator: None,
             author: None,
             creator_tool: None,
-            pdf_version: 1,
+            pdf_version: Version {
+                primary: 1,
+                secondary: 0
+            },
             title: None,
             xmp_toolkit: None,
             create_date: None,
@@ -63,24 +80,42 @@ fn read_metadata(child: &mut Child) -> Option<Metadata> {
 }
 
 fn main() {
-    let path = "pdf/lvmh/";
+    let mut metas: Vec<Metadata> = Vec::new();
 
+    let path = "pdf/lvmh/";
     let paths = fs::read_dir(path).unwrap();
     for path in paths {
-        let filename = path.unwrap().path();
+        let pathname = path.unwrap().path();
+        let string_path = pathname.clone()
+            .into_os_string()
+            .into_string()
+            .unwrap();
+        let filename = string_path.split('/')
+            .next_back()
+            .unwrap();
+
+        if !filename.ends_with(".pdf") {
+            continue;
+        }
 
         let output = Command::new("exiftool")
-            .arg(&filename)
+            .arg(&pathname)
             .stdout(Stdio::piped())
             .spawn();
 
-        let meta = read_metadata(&mut output.unwrap());
+        let meta = read_metadata(filename, &mut output.unwrap());
         match meta {
-            Some(meta) => match meta.producer {
-                Some(producer) => println!("Producer: {}", producer),
-                None => ()
-            },
-            None => println!("Could not read metadata for {}", filename.display())
+            Some(meta) => metas.push(meta),
+            None => println!("Could not read metadata for {}", pathname.display())
         }
     }
+
+    let mut versions: HashMap<Version, u64> = HashMap::new();
+    
+    for meta in metas {
+        if versions.contains_key(&meta.pdf_version) {
+            versions.
+        }
+    }
+
 }
