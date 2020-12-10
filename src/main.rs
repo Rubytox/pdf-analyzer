@@ -3,14 +3,23 @@ use std::io::{BufRead, BufReader};
 use std::process::Child;
 use std::process::Command;
 use std::process::Stdio;
+use std::fmt::Display;
 
 use std::collections::HashMap;
 
+#[derive(Hash, Eq, PartialEq, Debug, Clone, Copy)]
 struct Version {
     primary: u64,
     secondary: u64
 }
 
+impl Display for Version {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}.{}", self.primary, self.secondary)
+    }
+}
+
+#[derive(Debug)]
 struct Metadata {
     filename: String,
     producer: Option<String>,
@@ -37,7 +46,7 @@ fn update_metadata(meta: &mut Metadata, line: String) {
             let version = parts[1].parse::<f64>().unwrap();
             meta.pdf_version = Version {
                 primary: version.trunc() as u64,
-                secondary: version.fract() as u64
+                secondary: (10.0 * version.fract()) as u64
             };
         },
         "Title" => meta.title = Some(parts[1].into()),
@@ -111,11 +120,14 @@ fn main() {
     }
 
     let mut versions: HashMap<Version, u64> = HashMap::new();
-    
-    for meta in metas {
-        if versions.contains_key(&meta.pdf_version) {
-            versions.
-        }
-    }
 
+    metas.iter().for_each(|m| {
+        let count = versions.entry(m.pdf_version)
+            .or_insert(0);
+        *count += 1;
+    });
+    
+    for (version, counter) in &versions {
+        println!("Version {} has been used {} times", version, counter);
+    }
 }
