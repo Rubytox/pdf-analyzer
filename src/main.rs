@@ -1,16 +1,16 @@
+use std::fmt::Display;
 use std::fs;
 use std::io::{BufRead, BufReader};
 use std::process::Child;
 use std::process::Command;
 use std::process::Stdio;
-use std::fmt::Display;
 
 use std::collections::HashMap;
 
 #[derive(Hash, Eq, PartialEq, Debug, Clone, Copy)]
 struct Version {
     primary: u64,
-    secondary: u64
+    secondary: u64,
 }
 
 impl Display for Version {
@@ -42,13 +42,13 @@ fn update_metadata(meta: &mut Metadata, line: String) {
         "Creator" => meta.creator = Some(parts[1].into()),
         "Author" => meta.author = Some(parts[1].into()),
         "CreatorTool" => meta.creator_tool = Some(parts[1].into()),
-        "PDFVersion" => { 
+        "PDFVersion" => {
             let version = parts[1].parse::<f64>().unwrap();
             meta.pdf_version = Version {
                 primary: version.trunc() as u64,
-                secondary: (10.0 * version.fract()) as u64
+                secondary: (10.0 * version.fract()) as u64,
             };
-        },
+        }
         "Title" => meta.title = Some(parts[1].into()),
         "XMPToolkit" => meta.xmp_toolkit = Some(parts[1].into()),
         "CreateDate" => meta.create_date = Some(parts[1].into()),
@@ -69,7 +69,7 @@ fn read_metadata(filename: &str, child: &mut Child) -> Option<Metadata> {
             creator_tool: None,
             pdf_version: Version {
                 primary: 1,
-                secondary: 0
+                secondary: 0,
             },
             title: None,
             xmp_toolkit: None,
@@ -95,13 +95,8 @@ fn main() {
     let paths = fs::read_dir(path).unwrap();
     for path in paths {
         let pathname = path.unwrap().path();
-        let string_path = pathname.clone()
-            .into_os_string()
-            .into_string()
-            .unwrap();
-        let filename = string_path.split('/')
-            .next_back()
-            .unwrap();
+        let string_path = pathname.clone().into_os_string().into_string().unwrap();
+        let filename = string_path.split('/').next_back().unwrap();
 
         if !filename.ends_with(".pdf") {
             continue;
@@ -115,15 +110,14 @@ fn main() {
         let meta = read_metadata(filename, &mut output.unwrap());
         match meta {
             Some(meta) => metas.push(meta),
-            None => println!("Could not read metadata for {}", pathname.display())
+            None => println!("Could not read metadata for {}", pathname.display()),
         }
     }
 
     let mut versions: HashMap<Version, u64> = HashMap::new();
 
     metas.iter().for_each(|m| {
-        let count = versions.entry(m.pdf_version)
-            .or_insert(0);
+        let count = versions.entry(m.pdf_version).or_insert(0);
         *count += 1;
     });
 
