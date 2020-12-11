@@ -126,8 +126,8 @@ fn main() {
             .or_insert(0);
         *count += 1;
     });
-    
-    for (version, counter) in &versions {
+
+    versions.iter().for_each(|(version, counter)| {
         println!("Version {} has been used {} times", version, counter);
-    }
+    });
 }
