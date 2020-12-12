@@ -6,6 +6,9 @@ use std::process::Command;
 use std::process::Stdio;
 
 use std::collections::HashMap;
+use std::collections::HashSet;
+
+use regex::Regex;
 
 #[derive(Hash, Eq, PartialEq, Debug, Clone, Copy)]
 struct Version {
@@ -31,6 +34,25 @@ struct Metadata {
     xmp_toolkit: Option<String>,
     create_date: Option<String>,
     modify_date: Option<String>,
+}
+
+fn get_os(meta: &Metadata) -> Option<String> {
+    // First we check on producer
+    if let Some(producer) = &meta.producer {
+        let re = Regex::new(r".*\((.*)\).*").unwrap();
+        for cap in re.captures_iter(producer) {
+            println!("In-use OS: {}", &cap[1]);
+
+            return Some(String::from(&cap[1]));
+        }
+    }
+    if let Some(creator_tool) = &meta.creator_tool {
+        let re = Regex::new(r"PScript.*\.dll").unwrap();
+        if re.is_match(creator_tool) {
+            return Some("Windows".to_string());
+        }
+    }
+    None
 }
 
 fn update_metadata(meta: &mut Metadata, line: String) {
@@ -121,7 +143,51 @@ fn main() {
         *count += 1;
     });
 
-    versions.iter().for_each(|(version, counter)| {
-        println!("Version {} has been used {} times", version, counter);
+    metas.iter().for_each(|m| {
+        match &m.create_date {
+            Some(date) => println!("Creation date: {}", date),
+            None => println!("No date")
+        };
     });
+
+    metas.iter().for_each(|m| {
+        get_os(m);
+    });
+
+    let mut all_meta: HashMap<&str, HashSet<String>> = HashMap::new();
+    all_meta.insert("Producer", HashSet::new());
+    all_meta.insert("Creator", HashSet::new());
+    all_meta.insert("Author", HashSet::new());
+    all_meta.insert("Creator Tool", HashSet::new());
+    
+    metas.iter_mut().for_each(|m| {
+        match &m.producer {
+            Some(v) => update_hashset(&mut all_meta, "Producer", v),
+            None => ()
+        };
+        match &m.creator {
+            Some(v) => update_hashset(&mut all_meta, "Creator", v),
+            None => ()
+        };
+        match &m.author {
+            Some(v) => update_hashset(&mut all_meta, "Author", v),
+            None => ()
+        };
+        match &m.creator_tool {
+            Some(v) => update_hashset(&mut all_meta, "Creator Tool", v),
+            None => ()
+        };
+    });
+
+    all_meta.iter().for_each(|(id, set)| {
+        println!("{}: {:?}", id, set);
+    });
+
+    // versions.iter().for_each(|(version, counter)| {
+    //     println!("Version {} has been used {} times", version, counter);
+    // });
+}
+
+fn update_hashset(h: &mut HashMap<&str, HashSet<String>>, k: &str, v: &String) {
+    h.get_mut(k).unwrap().insert(v.clone());
 }
